@@ -7,43 +7,67 @@ namespace api.Repositories
     public interface IClientRepository
     {
         Task<Client[]> Get();
-        Task Create(Client client);
-        Task Update(Client client);
+        Task<Client[]> Search(string name);
+        Task<IResult> Create(Client client);
+        Task<IResult> Update(Client client);
     }
 
     public class ClientRepository : IClientRepository
     {
         private readonly DataContext dataContext;
 
+        
+
         public ClientRepository(DataContext dataContext)
         {
             this.dataContext = dataContext;
         }
 
-        public async Task Create(Client client)
+        public async Task<Client[]> Get()
         {
-            await dataContext.AddAsync(client);
-            await dataContext.SaveChangesAsync();
+            return await dataContext.Clients.ToArrayAsync();
         }
 
-        public Task<Client[]> Get()
+        public async Task<Client[]> Search(string name)
         {
-            return dataContext.Clients.ToArrayAsync();
+            var lowerName = name.ToLower();
+            return await dataContext.Clients.Where(x => x.FirstName.ToLower().StartsWith(lowerName) || x.LastName.ToLower().StartsWith(lowerName)).ToArrayAsync();
         }
 
-        public async Task Update(Client client)
+        public async Task<IResult> Create(Client client)
+        {
+            try
+            {
+                await dataContext.AddAsync(client);
+                await dataContext.SaveChangesAsync();
+                return Results.Ok();
+            }
+            catch (Exception ex)
+            {
+                return Results.Problem(ex.Message);
+            }
+        }
+
+        public async Task<IResult> Update(Client client)
         {
             var existingClient = await dataContext.Clients.FirstOrDefaultAsync(x => x.Id == client.Id);
 
             if (existingClient == null)
-                return;
+                return Results.NotFound();
 
             existingClient.FirstName = client.FirstName;
             existingClient.LastName = client.LastName;
             existingClient.Email = client.Email;
             existingClient.PhoneNumber = client.PhoneNumber;
-
-            await dataContext.SaveChangesAsync();
+            try
+            {
+                await dataContext.SaveChangesAsync();
+                return Results.Ok();
+            }
+            catch (Exception ex)
+            {
+                return Results.Problem(ex.Message);
+            }   
         }
     }
 }
